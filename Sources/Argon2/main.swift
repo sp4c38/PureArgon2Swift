@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum Argon2Typ: Int {
+enum Argon2Typ: UInt32 {
     case argon2d = 0
     case argon2i = 1
     case argon2id = 2
@@ -32,10 +32,10 @@ struct Argon2Eingabewerte {
     let ausgabelänge: UInt32 // in Byte
     let speichernutzung: UInt32 // in Kibibyte
     let durchgänge: UInt32
-    let versionsnummer: Data = Data([19]) // Ein Byte mit 0x13 (19 in Dezimal).
     let geheimerWert: String = ""
     let zugehörigeDaten: String = ""
-    let typ: Argon2Typ = .argon2id
+    let version: UInt32 = 0x13
+    let typ: Argon2Typ = .argon2d
 }
 
 /// Liest die Eingabe von den Kommandozeile-Argumenten.
@@ -92,13 +92,15 @@ func eingabeVonKommandozeileLesen() -> Argon2Eingabewerte? {
         durchgänge: durchgänge
     )
 }
-
-func main() {
-    guard let eingabe = eingabeVonKommandozeileLesen() else {
-        print("Eingabe ist ungültig.")
-        exit(1)
-    }
+import Blake2
+func main() {    
+//    guard let eingabe = eingabeVonKommandozeileLesen() else {
+//        print("Eingabe ist ungültig.")
+//        exit(1)
+//    }
     
+    let eingabe = Argon2Eingabewerte(passwort: "Passwort", salt: "Salt12345", parallelität: 1, ausgabelänge: 64, speichernutzung: 8, durchgänge: 1)
+
     let hashwert = Argon2.hashwertBerechnen(eingabe: eingabe)
 
     var ausgabe = ""
@@ -110,6 +112,7 @@ func main() {
     ausgabe += "\(eingabe.salt.data(using: .utf8)!.base64EncodedString())$"
     ausgabe += "\(hashwert.base64EncodedString())"
 
+    print("Hash: \(hashwert.hexWert)")
     print("{\"hash\": \"\(ausgabe)\"}")
 }
 

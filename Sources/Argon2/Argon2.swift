@@ -44,44 +44,32 @@ func hashfunktionHBerechnen(von daten: Data, ausgabelänge: Int) -> Data {
 ///   - daten: Die Daten die verschlüsselt werden sollen.
 ///   - ausgabelänge: Die Ausgabelänge des Hashes.
 /// - Returns: den Hash
-func hashfunktionH$Berechnen(von daten: Data, ausgabelänge: Int) -> Data {
-    var ergebnis = Data(capacity: ausgabelänge)
+func hashfunktionH$Berechnen(von daten: Data, ausgabelänge: UInt32) -> Data {
     if ausgabelänge <= 64 {
-        var hashfunktionHDaten = Data()
-        hashfunktionHDaten.append(withUnsafeBytes(of: ausgabelänge.littleEndian) { Data($0) })
-        hashfunktionHDaten.append(daten)
-        ergebnis.append(hashfunktionHBerechnen(von: hashfunktionHDaten, ausgabelänge: Int(ausgabelänge)))
+        var blake2b = try! Blake2(.b2b, size: Int(ausgabelänge))
+        blake2b.update(withUnsafeBytes(of: UInt32(ausgabelänge).littleEndian) { Data($0) })
+        blake2b.update(daten)
+        return try! blake2b.finalize()
     } else {
-        let hashfunktionHMaxAusgabelänge = 64
-        // Zuerst wird die Anzahl an 32-Byte Blöcken ausgerechnet, die maximal möglich ist bei gegebener Ausgabelänge. Dieses Ergebnis
-        // wird aufgerundet. Nun werden zwei 32-Byte Blöcke abgezogen. Muss nichts aufgerundet werden, so wird der Füllblock somit später
-        // genau 64-Byte groß sein. Wird aufgerundet, so wird der Füllblock später <64 Byte sein mit maximal [31/32=1,96875]*32 Byte Größe.
-        let hauptBlöckeAnzahl = Int(ceil(Double(ausgabelänge)/32))-2
-        var blöcke = [Data]()
-        // Einfachheitshalber wird mit 0 angefangen zu zählen, statt mit 1, wie in der originalen Dokumentation, damit die Blocknummer
-        // den gleichen Wert hat, wie sie später den Index in der 'blöcke' Liste hat. Dies hat keinen Effekt auf das finale Ergebnis.
-        for blockNummer in 0..<hauptBlöckeAnzahl {
-            if blockNummer == 0 {
-                var eingabeDaten = Data()
-                eingabeDaten.append(withUnsafeBytes(of: ausgabelänge) { Data($0) })
-                eingabeDaten.append(daten)
-                blöcke.append(hashfunktionHBerechnen(von: eingabeDaten, ausgabelänge: hashfunktionHMaxAusgabelänge))
-            } else {
-                blöcke.append(hashfunktionHBerechnen(von: blöcke[blockNummer-1], ausgabelänge: hashfunktionHMaxAusgabelänge))
-            }
-        }
-        let füllBlockAusgabelänge = ausgabelänge-32*hauptBlöckeAnzahl // 32,03125 <= n <= 64 Byte
-        let füllBlock = hashfunktionHBerechnen(von: blöcke[hauptBlöckeAnzahl-1], ausgabelänge: füllBlockAusgabelänge)
+        var ergebnis = Data()
         
-        // Von den erstellten Blöcken (außer von dem Füllblock) werden jeweils die ersten 32 Byte genommen.
-        blöcke.map { $0[0..<32] }.forEach { ergebnis.append($0) }
-        ergebnis.append(füllBlock)
+        var blake2b = try! Blake2(.b2b, size: 64)
+        blake2b.update(withUnsafeBytes(of: UInt32(ausgabelänge).littleEndian) { Data($0) })
+        blake2b.update(daten)
+        var v_block = try! blake2b.finalize()
+        ergebnis.append(v_block[0..<32])
+        
+        var remainingLength = Int(ausgabelänge) - 32
+        while remainingLength > 64 {
+            v_block = try! Blake2.hash(.b2b, size: 64, data: v_block)
+            ergebnis.append(v_block[0..<32])
+            remainingLength -= 32
+        }
+        v_block = try! Blake2.hash(.b2b, size: remainingLength, data: v_block)
+        ergebnis.append(v_block[0..<32])
+        
+        return ergebnis
     }
-    // Ist der if-else Block richtig, so sollte das Ergebnis immer einen Wert haben. Da es jedoch aufgrund von potenziellen
-    // Fehlern dazu kommen kann, dass das Ergebnis wohlmöglich leer ist, wird dies hier geprüft.
-    guard !ergebnis.isEmpty else { print("Ergebnis einer H$ Berechnung ist unerwartet leer."); exit(1) }
-    
-    return ergebnis
 }
 
 
@@ -222,48 +210,52 @@ func kompressionGBerechnen(x: Data, y: Data) -> Data {
 /// Für die BLAKE2b Funktion wird aktuell eine externe Bibliothek genutzt.
 /// - Parameter eingabe: Die Argon2 Eingabewerte.
 func startwertH0Berechnen(eingabe: Argon2Eingabewerte) -> Data {
-    // In 'little endian' Systemen werden die Bytes in umgekehrter Richtung gespeichert, als wir sie schreiben würden.
-    // Bits werden nicht von links nach rechts, sondern von rechts nach links gelesen.
-    var blake2bEingabeDaten = Data()
-    blake2bEingabeDaten.append(withUnsafeBytes(of: eingabe.parallelität.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(withUnsafeBytes(of: eingabe.ausgabelänge.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(withUnsafeBytes(of: eingabe.speichernutzung.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(withUnsafeBytes(of: eingabe.durchgänge.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(withUnsafeBytes(of: eingabe.versionsnummer) { Data($0) })
-    blake2bEingabeDaten.append(withUnsafeBytes(of: eingabe.typ.rawValue.littleEndian) { Data($0) })
-    let passwortByteMenge = eingabe.passwort.utf8.count
-    blake2bEingabeDaten.append(withUnsafeBytes(of: passwortByteMenge.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(eingabe.passwort.data(using: .utf8)!)
+    var blake2b = try! Blake2(.b2b, size: 64)
     
-    let saltByteMenge = eingabe.salt.utf8.count
-    blake2bEingabeDaten.append(withUnsafeBytes(of: saltByteMenge.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(eingabe.salt.data(using: .utf8)!)
+    [eingabe.parallelität,
+     eingabe.ausgabelänge,
+     eingabe.speichernutzung,
+     eingabe.durchgänge,
+     eingabe.version,
+     eingabe.typ.rawValue
+    ].forEach { (element: UInt32) in
+        blake2b.update(withUnsafeBytes(of: element.littleEndian) { Data($0) })
+    }
     
-    let geheimerWertByteMenge = eingabe.geheimerWert.utf8.count
-    blake2bEingabeDaten.append(withUnsafeBytes(of: geheimerWertByteMenge.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(eingabe.geheimerWert.data(using: .utf8)!)
+    blake2b.update(withUnsafeBytes(of: UInt32(eingabe.passwort.utf8.count)) { Data($0) })
+    blake2b.update(eingabe.passwort.data(using: .utf8)!)
+
+    blake2b.update(withUnsafeBytes(of: UInt32(eingabe.salt.utf8.count).littleEndian) { Data($0) })
+    blake2b.update(eingabe.salt.data(using: .utf8)!)
     
-    let zugehörigeDatenByteMenge = eingabe.zugehörigeDaten.utf8.count
-    blake2bEingabeDaten.append(withUnsafeBytes(of: zugehörigeDatenByteMenge.littleEndian) { Data($0) })
-    blake2bEingabeDaten.append(eingabe.zugehörigeDaten.data(using: .utf8)!)
+    blake2b.update(withUnsafeBytes(of: UInt32(eingabe.geheimerWert.utf8.count).littleEndian) { Data($0) })
+    blake2b.update(eingabe.geheimerWert.data(using: .utf8)!)
+
+    blake2b.update(withUnsafeBytes(of: UInt32(eingabe.zugehörigeDaten.utf8.count).littleEndian) { Data($0) })
+    blake2b.update(eingabe.zugehörigeDaten.data(using: .utf8)!)
     
-    let h0Data = hashfunktionHBerechnen(von: blake2bEingabeDaten, ausgabelänge: 64)
+    let h0Data = try! blake2b.finalize()
+    print(h0Data.hexWert)
     
     return h0Data
 }
 
 
-/// Diese Funktion berechnet B[i][0] für jede Reihe.
+/// Diese Funktion berechnet B[i][fürIndexInReihe] für jede Reihe.
 ///
 /// Für die Berechnung wird die H$ Hashfunktion genutzt.
-func startBlöckeInMatrixBerechnen(matrix: inout [[Data]], startwertH0: Data, fürIndexInReihe indexInReihe: Int) {
-    for reiheIndex in matrix.indices {
-        var hashfunktionH$Daten = Data()
-        hashfunktionH$Daten.append(startwertH0)
-        hashfunktionH$Daten.append(withUnsafeBytes(of: indexInReihe.littleEndian) { Data($0) })
-        hashfunktionH$Daten.append(withUnsafeBytes(of: reiheIndex.littleEndian) { Data($0) })
-        let hashwert = hashfunktionH$Berechnen(von: hashfunktionH$Daten, ausgabelänge: 1024)
-        matrix[reiheIndex][indexInReihe].append(contentsOf: hashwert)
+func startBlöckeInMatrixBerechnen(matrix: inout [[Data]], startwertH0: Data) {
+    for i in matrix.indices {
+        for j in [0, 1] {
+            var data = Data()
+            data.append(startwertH0)
+            data.append(withUnsafeBytes(of: UInt32(j).littleEndian) { Data($0) })
+            data.append(withUnsafeBytes(of: UInt32(i).littleEndian) { Data($0) })
+            let hash = hashfunktionH$Berechnen(von: data, ausgabelänge: 1024)
+            matrix[i][0] = hash
+            
+            print("\n\(i) \(j): \(hash.hexWert)\n")
+        }
     }
 }
 
@@ -387,39 +379,40 @@ func matrixFinaleBlöckeZusammenrechnen(matrix: inout Matrix<Data>) -> Data {
 func hashwertBerechnen(eingabe: Argon2Eingabewerte) -> Data {
     // MARK: 3.2 (1)
     let startwertH0 = startwertH0Berechnen(eingabe: eingabe)
-    
+
     // MARK: 3.2 (2)
     // m' = 4 * p * floor (m / 4p)
     // Diese Gleichung rechnet die benötigte Speichermenge für die späteren Berechnungen aus. Dieser Wert ist wohlmöglich
     // unterschiedlich, als die eingegebene Speichermenge. Sie stellt sicher, dass die Menge an Blöcken/Spalten pro Reihe
     // in der später gebildeten zweidimensionalen Matrix durch 4 teilbar ist und, dass jede Reihe gleich viele Spalten besitzt.
-    // TODO: Understand why one lane needs columns to be multiple of 4.
-    let benötigterSpeicherKiB: UInt = ( // Speichermenge in Kibibyte Anzahl
-        4 * UInt(eingabe.parallelität) * UInt(floor(Double(eingabe.speichernutzung / (4 * eingabe.parallelität))))
+
+    let benötigterSpeicherKiB: UInt32 = ( // Speichermenge in Kibibyte Anzahl
+        4 * eingabe.parallelität * (eingabe.speichernutzung / (4 * eingabe.parallelität))
     )
+    print(benötigterSpeicherKiB)
+    
 //    let benötigterSpeicherByte = benötigterSpeicherKiB*1024
 //    print("Benötigter Speicher beträgt \(benötigterSpeicherByte) Byte.")
     
     // Matrix erstellen
-    let spaltenAnzahl = benötigterSpeicherKiB / UInt(eingabe.parallelität)
+    let spaltenAnzahl = benötigterSpeicherKiB / eingabe.parallelität
     var matrix: Matrix = (1...eingabe.parallelität).compactMap { _ in
         (1...spaltenAnzahl).compactMap { _ in
             Data(capacity: 1024)
         }
     }
+    print(matrix.count, matrix[0].count)
 //    print("Zwei dimensionale Matrix aus \(eingabe.parallelität) Reihe(n) mit je \(spaltenAnzahl) Spalten wurde gebildet.")
 
-    // MARK: 3.2 (3)
-    startBlöckeInMatrixBerechnen(matrix: &matrix, startwertH0: startwertH0, fürIndexInReihe: 0)
-
-    // MARK: 3.2 (4)
-    startBlöckeInMatrixBerechnen(matrix: &matrix, startwertH0: startwertH0, fürIndexInReihe: 1)
+    // MARK: 3.2 (3) und 3.2 (4)
+    startBlöckeInMatrixBerechnen(matrix: &matrix, startwertH0: startwertH0)
 
     // MARK: 3.2 (5)
-    matrix = weitereBlöckeInMatrixBerechnen(matrix: matrix, matrixSpaltenAnzahl: Int(spaltenAnzahl), durchgänge: eingabe.durchgänge)
+//    matrix = weitereBlöckeInMatrixBerechnen(matrix: matrix, matrixSpaltenAnzahl: Int(spaltenAnzahl), durchgänge: eingabe.durchgänge)
+//
+//    let matrixErgebnis = matrixFinaleBlöckeZusammenrechnen(matrix: &matrix)
+//    let hashwert = hashfunktionH$Berechnen(von: matrixErgebnis, ausgabelänge: Int(eingabe.ausgabelänge))
     
-    let matrixErgebnis = matrixFinaleBlöckeZusammenrechnen(matrix: &matrix)
-    let hashwert = hashfunktionH$Berechnen(von: matrixErgebnis, ausgabelänge: Int(eingabe.ausgabelänge))
-    
-    return hashwert
+//    return hashwert
+    return Data()
 }
