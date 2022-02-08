@@ -59,15 +59,16 @@ func hashfunktionH$Berechnen(von daten: Data, ausgabelänge: UInt32) -> Data {
         var v_block = try! blake2b.finalize()
         ergebnis.append(v_block[0..<32])
         
-        var remainingLength = Int(ausgabelänge) - 32
+        var remainingLength = Int(ausgabelänge)-32
+        
         while remainingLength > 64 {
             v_block = try! Blake2.hash(.b2b, size: 64, data: v_block)
             ergebnis.append(v_block[0..<32])
             remainingLength -= 32
         }
+
         v_block = try! Blake2.hash(.b2b, size: remainingLength, data: v_block)
-        ergebnis.append(v_block[0..<32])
-        
+        ergebnis.append(v_block)
         return ergebnis
     }
 }
