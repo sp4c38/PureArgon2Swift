@@ -34,9 +34,14 @@ extension Data {
         return self.map { String(format: "%02X", $0) }.joined()
     }
 
-    /// Die zugrunde liegenden Daten werden als UInt32 gelesen.
+    /// Die zugrunde liegenden Daten werden als UInt64 gelesen.
     var uint64: UInt64 {
         self.padded(to: 8, padDirection: .right).withUnsafeBytes { $0.load(as: UInt64.self) }
+    }
+    
+    /// Die zugrunde liegenden Daten werden als UInt32 gelesen.
+    var uint32: UInt32 {
+        self.withUnsafeBytes { $0.load(as: UInt32.self) }
     }
     
     /// Die zugrunde liegenden Daten werden als BigUInt gelesen.
@@ -108,4 +113,30 @@ func zeitMessen<T>(_ codeBlock: () -> (T)) -> T {
     let endZeit = Date()
     print("Zeit: \(endZeit.timeIntervalSince(startZeit))")
     return ausgabe
+}
+
+
+extension String {
+    
+    /// Create `Data` from hexadecimal string representation
+    ///
+    /// This creates a `Data` object from hex string. Note, if the string has any spaces or non-hex characters (e.g. starts with '<' and with a '>'), those are ignored and only hex characters are processed.
+    ///
+    /// - returns: Data represented by this hexadecimal string.
+    
+    var hexadecimal: Data? {
+        var data = Data(capacity: count / 2)
+        
+        let regex = try! NSRegularExpression(pattern: "[0-9a-f]{1,2}", options: .caseInsensitive)
+        regex.enumerateMatches(in: self, range: NSRange(startIndex..., in: self)) { match, _, _ in
+            let byteString = (self as NSString).substring(with: match!.range)
+            let num = UInt8(byteString, radix: 16)!
+            data.append(num)
+        }
+        
+        guard data.count > 0 else { return nil }
+        
+        return data
+    }
+    
 }

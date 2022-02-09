@@ -73,101 +73,48 @@ func hashfunktionH$Berechnen(von daten: Data, ausgabelänge: UInt32) -> Data {
     }
 }
 
-
-// MARK: Permutation
-
-/// Erstellt die Matrix, die für die Permutation benötigt wird.
-/// - Parameter eingabe: Acht 16-Byte Blöcke.
-/// - Returns: Eine 4x4 Matrix 8-Byte großen Blöcken.
-func permutationMatrixErstellen(eingabeDaten: [Data]) -> Matrix<Data> {
-    let summeByteAnzahlEingabeDaten = eingabeDaten.reduce(0) { $0+($1.count) }
-    guard !eingabeDaten.isEmpty || eingabeDaten.count == 8 || summeByteAnzahlEingabeDaten == 8*16 else { print("Eingaben zur Erstellung der Matrix für die Permutation sind ungültig."); exit(1) }
-    
-    var matrix = Matrix<Data>()
-    var count = 0
-    for eingabe in eingabeDaten {
-        let reiheIndex = count%4 == 0 ? matrix.endIndex : matrix.endIndex-1
-        if matrix[sicher: reiheIndex] == nil { matrix.insert([], at: reiheIndex) }
-        matrix[reiheIndex].append(eingabe[8...15])
-        matrix[reiheIndex].append(eingabe[0...7])
-        count += 2
-    }
-
-    return matrix
-}
-
-typealias MatrixEintragPath = WritableKeyPath<Matrix<Data>, Data>
 /// Wendet die Permutations auf die Daten an.
 /// - Parameter eingabe: Eine Liste von 4 Elementen je 8 Byte groß.
-func permutationGBBerechnen(matrix m: inout Matrix<Data>, a aPath: MatrixEintragPath, b bPath: MatrixEintragPath, c cPath: MatrixEintragPath, d dPath: MatrixEintragPath) {
-    var (a, b, c, d) = (m[keyPath: aPath].bigUInt, m[keyPath: bPath].bigUInt, m[keyPath: cPath].bigUInt, m[keyPath: dPath].bigUInt)
-    
+func permutationGBBerechnen(_ v: inout [BigUInt], _ a: Int, _ b: Int, _ c: Int, _ d: Int) {
     let zweiHoch64 = BigUInt(2).power(64)
     for durchgang in (1...2) {
-        a = ( a + b + 2 * (a.serializeLittleEndian().prefix(4).bigUInt * b.serializeLittleEndian().prefix(4).bigUInt) ) % zweiHoch64
-        d = BigUInt((d ^ a).serializeLittleEndian().uint64 >>> (durchgang == 1 ? 32 : 16))
-        c = ( c + d + 2 * (c.serializeLittleEndian().prefix(4).bigUInt * d.serializeLittleEndian().prefix(4).bigUInt) ) % zweiHoch64
-        b = BigUInt((b ^ c).serializeLittleEndian().uint64 >>> (durchgang == 1 ? 24 : 63))
+        v[a] = (v[a] + v[b] + 2 * (v[a].serializeLittleEndian().prefix(4).bigUInt * v[b].serializeLittleEndian().prefix(4).bigUInt) ) % zweiHoch64
+        v[d] = BigUInt((v[d] ^ v[a]).serializeLittleEndian().uint64 >>> (durchgang == 1 ? 32 : 16))
+        v[c] = (v[c] + v[d] + 2 * (v[c].serializeLittleEndian().prefix(4).bigUInt * v[d].serializeLittleEndian().prefix(4).bigUInt) ) % zweiHoch64
+        v[b] = BigUInt((v[b] ^ v[c]).serializeLittleEndian().uint64 >>> (durchgang == 1 ? 24 : 63))
     }
-    
-    m[keyPath: aPath] = a.serializeLittleEndian().padded(to: 8, padDirection: .right)
-    m[keyPath: bPath] = b.serializeLittleEndian().padded(to: 8, padDirection: .right)
-    m[keyPath: cPath] = c.serializeLittleEndian().padded(to: 8, padDirection: .right)
-    m[keyPath: dPath] = d.serializeLittleEndian().padded(to: 8, padDirection: .right)
-}
-
-/// Führt die Werte aus der Permutations-Matrix wieder zusammen.
-/// - Returns: Acht 16-Byte Blöcke.
-func permutationMatrixZusammenführen(aus matrix: Matrix<Data>) -> [Data] {
-    var ausgabeWerte = [Data]()
-    for reihe in matrix {
-        for aufgeteilterWert in reihe.aufteilen(jede: 2) {
-            ausgabeWerte.append(aufgeteilterWert[1] + aufgeteilterWert[0])
-        }
-    }
-    return ausgabeWerte
 }
 
 /// Führt die Argon2 Permutation (von lateinisch permutare 'vertauschen') durch.
 /// - Parameter eingabe: Acht 16-Byte Blöcke.
 /// mit dem Exit-Code 1.
-func permutationBerechnen(eingabeDaten: [Data]) -> [Data] {
-    var matrix = permutationMatrixErstellen(eingabeDaten: eingabeDaten)
-    typealias M = Matrix<Data>
-
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][0], b: \M[1][0], c: \M[2][0], d: \M[3][0])
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][1], b: \M[1][1], c: \M[2][1], d: \M[3][1])
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][2], b: \M[1][2], c: \M[2][2], d: \M[3][2])
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][3], b: \M[1][3], c: \M[2][3], d: \M[3][3])
-    
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][0], b: \M[1][1], c: \M[2][2], d: \M[3][3])
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][1], b: \M[1][2], c: \M[2][3], d: \M[3][0])
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][2], b: \M[1][3], c: \M[2][0], d: \M[3][1])
-    permutationGBBerechnen(matrix: &matrix, a: \M[0][3], b: \M[1][0], c: \M[2][1], d: \M[3][2])
-
-    return permutationMatrixZusammenführen(aus: matrix)
-}
-
-
-// MARK: Kompressionsfunktion G
-
-/// Erstellt die Matrix, die für die Kompressionsfunktion gebraucht wird.
-/// - Parameter daten: Die 1024-Byte langen Daten.
-/// - Returns: Eine 8x8 Matrix mit 16-Byte großen Blöcken.
-func kompressionMatrixErstellen(daten: Data) -> Matrix<Data> {
-    let aufgeteilteDaten = daten.aufteilen(jede: 16)
-    var matrix = Matrix<Data>()
-    for reihe in (1...8) {
-        matrix.append([])
-        let endIndex = (reihe * 8) - 1
-        let startIndex = endIndex - 7
-        
-        for index in startIndex...endIndex {
-            let daten = Data(aufgeteilteDaten[index])
-            matrix[reihe - 1].append(daten)
-        }
+func permutationBerechnen(_ eingabeDaten: [Data]) -> [Data] {
+    var v = [BigUInt]()
+    for i in 0...7 {
+        v.append(eingabeDaten[i][0...7].bigUInt)
+        v.append(eingabeDaten[i][8...15].bigUInt)
     }
-    return matrix
+
+    permutationGBBerechnen(&v, 0, 4, 8, 12)
+    permutationGBBerechnen(&v, 1, 5, 9, 13)
+    permutationGBBerechnen(&v, 2, 6, 10, 14)
+    permutationGBBerechnen(&v, 3, 7, 11, 15)
+
+    permutationGBBerechnen(&v, 0, 5, 10, 15)
+    permutationGBBerechnen(&v, 1, 6, 11, 12)
+    permutationGBBerechnen(&v, 2, 7, 8, 13)
+    permutationGBBerechnen(&v, 3, 4, 9, 14)
+
+    var result = [Data]()
+    for i in 0...7 {
+        result.append(
+            v[2*i].serializeLittleEndian() +
+            v[2*i+1].serializeLittleEndian()
+        )
+    }
+    print(result.map { $0.hexWert })
+//    return permutationMatrixZusammenführen(aus: matrix)
+    return []
 }
 
 /// Berechnet den Kompressionswert.
@@ -177,31 +124,47 @@ func kompressionMatrixErstellen(daten: Data) -> Matrix<Data> {
 /// - Returns: Das Ergebnis als 1024-Byte Block.
 func kompressionGBerechnen(x: Data, y: Data) -> Data {
     // x XOR y
-    let r = (x.bigUInt ^ y.bigUInt).serializeLittleEndian().padded(to: 1024, padDirection: .right)
-    
-    var matrix = kompressionMatrixErstellen(daten: r)
+    let R = (x.bigUInt ^ y.bigUInt).serializeLittleEndian().padded(to: 1024, padDirection: .right)
+    var Q = [Data]()
     
     // Permutation auf jede Reihe anwenden.
-    for reiheIndex in matrix.indices {
-        matrix[reiheIndex] = permutationBerechnen(eingabeDaten: matrix[reiheIndex])
+    for i in stride(from: 0, through: 56, by: 8) {
+        var inputs: [Data] = [
+            R[    i*16..<(i+1)*16],
+            R[(i+1)*16..<(i+2)*16],
+            R[(i+2)*16..<(i+3)*16],
+            R[(i+3)*16..<(i+4)*16],
+            R[(i+4)*16..<(i+5)*16],
+            R[(i+5)*16..<(i+6)*16],
+            R[(i+6)*16..<(i+7)*16],
+            R[(i+7)*16..<(i+8)*16]
+        ]
+        inputs = inputs.map { Data($0) }
+        
+        Q.append(contentsOf:
+            permutationBerechnen(inputs)
+        )
+        exit(0)
     }
-
-    // Permutation auf jede Spalte anwenden.
-    for elementIndex in (0...7) {
-        let spalte = matrix.map { $0[elementIndex] }
-        let permutation = permutationBerechnen(eingabeDaten: spalte)
-        for permutationIndex in permutation.indices {
-            matrix[permutationIndex][elementIndex] = permutation[permutationIndex]
-        }
-    }
-    
-    // Matrix zusammenführen
-    let z = matrix.reduce(Data()) { $0 + $1.reduce(Data()) { $0 + $1 } }
-
-    // z XOR r
-    let ergebnis = (z.bigUInt ^ r.bigUInt).serializeLittleEndian().padded(to: 1024, padDirection: .right)
-    
-    return ergebnis
+    print(Q)
+//
+//    // Permutation auf jede Spalte anwenden.
+//    for elementIndex in (0...7) {
+//        let spalte = matrix.map { $0[elementIndex] }
+//        let permutation = permutationBerechnen(eingabeDaten: spalte)
+//        for permutationIndex in permutation.indices {
+//            matrix[permutationIndex][elementIndex] = permutation[permutationIndex]
+//        }
+//    }
+//
+//    // Matrix zusammenführen
+//    let z = matrix.reduce(Data()) { $0 + $1.reduce(Data()) { $0 + $1 } }
+//
+//    // z XOR r
+//    let ergebnis = (z.bigUInt ^ R.bigUInt).serializeLittleEndian().padded(to: 1024, padDirection: .right)
+//
+//    return ergebnis
+    return Data(repeating: 100, count: 1024)
 }
 
 // MARK: Startwert- und Blockberechnung
@@ -253,9 +216,9 @@ func startBlöckeInMatrixBerechnen(matrix: inout [[Data]], startwertH0: Data) {
             data.append(withUnsafeBytes(of: UInt32(j).littleEndian) { Data($0) })
             data.append(withUnsafeBytes(of: UInt32(i).littleEndian) { Data($0) })
             let hash = hashfunktionH$Berechnen(von: data, ausgabelänge: 1024)
-            matrix[i][0] = hash
+            matrix[i][j] = hash
             
-            print("\n\(i) \(j): \(hash.hexWert)\n")
+//            print("\n\(i) \(j): \(hash.hexWert)\n")
         }
     }
 }
@@ -264,51 +227,40 @@ func startBlöckeInMatrixBerechnen(matrix: inout [[Data]], startwertH0: Data) {
 ///
 /// - Parameter spalteIndex: Der Index der Spalte, für den der Referenzblock ermittlet werden soll. Dieser Index muss im Segment segmentBereiche[segmentIndex] liegen.
 func referenzBlockPositionBerechnen(
-    matrix: Matrix<Data>, matrixSpaltenAnzahl: Int, durchgang: UInt32, reiheIndex: Int, spalteIndex: Int, segmentBereiche: [ClosedRange<Int>], segmentIndex: Int
+    matrix: Matrix<Data>, matrixSpaltenAnzahl: Int, durchgang: UInt32, i: Int, j: Int, segmentBereiche: [ClosedRange<Int>], segmentIndex: Int, parallelism: UInt32
 ) -> (Int, Int) {
-    // J1 und J2 ermitteln.
-    let vorherigerBlockSpalte = negativesModulo(a: spalteIndex-1, b: matrixSpaltenAnzahl)
-    let vorherigerBlock = matrix[reiheIndex][vorherigerBlockSpalte]
+    // MARK: J1 & J2
+    let previousColumn = matrix[i][negativesModulo(a: j-1, b: matrixSpaltenAnzahl)]
+    let J_1 = previousColumn[0...3].uint64.littleEndian
+    let J_2 = previousColumn[4...7].uint32.littleEndian
 
-    let J_1 = vorherigerBlock[0...3].uint64
-    let J_2 = vorherigerBlock[4...7].uint64
+    // MARK: Row l
+    let row = segmentIndex == 0 && durchgang == 1 ? i : Int(J_2 % parallelism)
 
-    let reihe = segmentIndex == 0 && durchgang == 1 ? reiheIndex : Int(J_2 % UInt64(matrix.count))
-
-    var spaltenIndizes = [Int]() // Speichert alle möglichen Indizes der Spalten, aus denen später eine ausgewählt wird.
-
-    segmentBereiche.indices.filter { prüfenderSegmentIndex in // Überprüfen, welche Segmente zu den letzten drei Segmenten gehören.
-        if durchgang == 1 {
-            return prüfenderSegmentIndex >= segmentIndex-3 && prüfenderSegmentIndex < segmentIndex
-        } else {
-            return prüfenderSegmentIndex >= negativesModulo(a: segmentIndex-3, b: 4) || prüfenderSegmentIndex < segmentIndex
-        }
-    }.forEach { spaltenIndizes.append(contentsOf: segmentBereiche[$0]) }
-
-    let aktuellesSegment = segmentBereiche[segmentIndex]
-    if reihe == reiheIndex {
-        spaltenIndizes.append(contentsOf: aktuellesSegment.filter { $0 < (spalteIndex-1) })
-    } else {
-        if spalteIndex == aktuellesSegment.lowerBound {
-            spaltenIndizes.removeLast()
+    // MARK: Column z
+    var areaSize: Int? = nil
+    if durchgang == 1 {
+        if row == i {
+            areaSize = j - 1
         }
     }
-
-    let indizesMenge: UInt64 = UInt64(spaltenIndizes.count)
-    let x = (J_1 * J_1) >> 32
-    let y = (indizesMenge * x) >> 32
-    let zz = indizesMenge - 1 - y
-
-    let spalte = spaltenIndizes[Int(zz)]
-
-    return (reihe, spalte)
+    guard let areaSize = areaSize else { exit(1) }
+    
+    let x = Int((J_1 * J_1) >> 32)
+    let y = (areaSize * x) >> 32
+    let relativePosition = areaSize - 1 - y
+    
+    var startPosition = 0
+    startPosition = (startPosition + relativePosition) % matrixSpaltenAnzahl
+    
+    return (row, startPosition)
 }
 
 /// Diese Funktion berechnet alle weiteren Blöcke in der Matrix B[i][j], wobei 0<=i<=p und 2<=j<=Anzahl Spalten.
-func weitereBlöckeInMatrixBerechnen(matrix: Matrix<Data>, matrixSpaltenAnzahl: Int, durchgänge: UInt32) -> Matrix<Data> {
+func weitereBlöckeInMatrixBerechnen(matrix: Matrix<Data>, matrixSpaltenAnzahl: Int, durchgänge: UInt32, parallelism: UInt32) -> Matrix<Data> {
     var matrix = matrix
     let segmentGröße = matrixSpaltenAnzahl / 4
-    let segmentBereiche = (0...3).map {
+    let segments = (0...3).map {
         ($0*segmentGröße)...(($0+1)*segmentGröße-1)
     }
     
@@ -317,46 +269,51 @@ func weitereBlöckeInMatrixBerechnen(matrix: Matrix<Data>, matrixSpaltenAnzahl: 
     let schloss = NSLock()
     
     for durchgang in 1...durchgänge {
-        for segmentIndex in segmentBereiche.indices {
-//            print("Segment \(segmentIndex) wird berechnet.")
-            
-            var segmentBereichAbgeändert = segmentBereiche[segmentIndex]
-            if durchgang == 1, segmentBereichAbgeändert.upperBound == 1 {
+        for segmentIndex in segments.indices {
+            var segment = segments[segmentIndex]
+
+            if durchgang == 1, segment.upperBound == 1 {
                 continue
             }
-            if durchgang == 1, segmentBereichAbgeändert.lowerBound == 0 {
-                segmentBereichAbgeändert = (segmentBereichAbgeändert.lowerBound+2)...segmentBereichAbgeändert.upperBound
+            if durchgang == 1, segment.lowerBound == 0 {
+                segment = (segment.lowerBound+2)...segment.upperBound
             }
             
-            for reiheIndex in matrix.indices {
-                dispatchGroup.enter()
-                dispatchQueue.async {
-                    for spalteIndex in segmentBereichAbgeändert {
-                        let berechnungSpalte = negativesModulo(a: spalteIndex-1, b: matrixSpaltenAnzahl)
-                        let berechnungBlock = matrix[reiheIndex][berechnungSpalte] // Block bei B[i][j-1]
-
+            for i in matrix.indices {
+//                dispatchGroup.enter()
+                
+//                dispatchQueue.async {
+                    for j in segment {
+                        let berechnungSpalte = negativesModulo(a: j-1, b: matrixSpaltenAnzahl)
+                        let berechnungBlock = matrix[i][berechnungSpalte] // Block bei B[i][j-1]
+                        
                         let referenzBlockPosition = referenzBlockPositionBerechnen(
-                            matrix: matrix, matrixSpaltenAnzahl: matrixSpaltenAnzahl, durchgang: durchgang, reiheIndex: reiheIndex, spalteIndex: spalteIndex, segmentBereiche: segmentBereiche, segmentIndex: segmentIndex
+                            matrix: matrix, matrixSpaltenAnzahl: matrixSpaltenAnzahl, durchgang: durchgang, i: i, j: j, segmentBereiche: segments, segmentIndex: segmentIndex, parallelism: parallelism
                         )
+
+                        print("\(i) \(j): \(referenzBlockPosition)")
                         let referenzBlock = matrix[referenzBlockPosition.0][referenzBlockPosition.1]
                         
                         var ergebnis: Data? = nil
                         if durchgang == 1 {
                             ergebnis = kompressionGBerechnen(x: berechnungBlock, y: referenzBlock)
+//                            print(ergebnis!.hexWert)
                         } else {
                             let vorläufigesErgebnis = kompressionGBerechnen(x: berechnungBlock, y: referenzBlock)
-                            ergebnis = (BigUInt(vorläufigesErgebnis) ^ BigUInt(matrix[reiheIndex][spalteIndex])).serialize()
+                            ergebnis = (BigUInt(vorläufigesErgebnis) ^ BigUInt(matrix[i][j])).serialize()
                         }
                         
+                        print()
                         schloss.lock()
-                        matrix[reiheIndex][spalteIndex] = ergebnis!
+                        matrix[i][j] = ergebnis!
                         schloss.unlock()
                     }
-                    dispatchGroup.leave()
-                }
+//                    dispatchGroup.leave()
+//                }
+                
             }
             
-            dispatchGroup.wait()
+//            dispatchGroup.wait()
         }
     }
     return matrix
@@ -409,11 +366,11 @@ func hashwertBerechnen(eingabe: Argon2Eingabewerte) -> Data {
     startBlöckeInMatrixBerechnen(matrix: &matrix, startwertH0: startwertH0)
 
     // MARK: 3.2 (5)
-//    matrix = weitereBlöckeInMatrixBerechnen(matrix: matrix, matrixSpaltenAnzahl: Int(spaltenAnzahl), durchgänge: eingabe.durchgänge)
+    matrix = weitereBlöckeInMatrixBerechnen(matrix: matrix, matrixSpaltenAnzahl: Int(spaltenAnzahl), durchgänge: eingabe.durchgänge, parallelism: eingabe.parallelität)
 //
 //    let matrixErgebnis = matrixFinaleBlöckeZusammenrechnen(matrix: &matrix)
-//    let hashwert = hashfunktionH$Berechnen(von: matrixErgebnis, ausgabelänge: Int(eingabe.ausgabelänge))
-    
+//    let hashwert = hashfunktionH$Berechnen(von: matrixErgebnis, ausgabelänge: eingabe.ausgabelänge)
+//
 //    return hashwert
     return Data()
 }
