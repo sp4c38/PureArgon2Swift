@@ -226,7 +226,7 @@ func startBlöckeInMatrixBerechnen(matrix: inout [[Data]], startwertH0: Data) {
 ///
 /// - Parameter spalteIndex: Der Index der Spalte, für den der Referenzblock ermittlet werden soll. Dieser Index muss im Segment segmentBereiche[segmentIndex] liegen.
 func referenzBlockPositionBerechnen(
-    matrix: Matrix<Data>, matrixSpaltenAnzahl: Int, durchgang: UInt32, i: Int, j: Int, segmentBereiche: [ClosedRange<Int>], segmentIndex: Int, parallelism: UInt32
+    matrix: Matrix<Data>, matrixSpaltenAnzahl: Int, durchgang: UInt32, i: Int, j: Int, segmentIndex: Int, segmentLength: Int, indexInSegment: Int, parallelism: UInt32
 ) -> (Int, Int) {
     // MARK: J1 & J2
     let previousColumn = matrix[i][negativesModulo(a: j-1, b: matrixSpaltenAnzahl)]
@@ -238,9 +238,14 @@ func referenzBlockPositionBerechnen(
 
     // MARK: Column z
     var areaSize: Int? = nil
+    // +1 is needed, as the index (which starts at 0) need to be converted to the count/area size (which starts at 1).
     if durchgang == 1 {
         if row == i {
-            areaSize = j - 1
+            areaSize = j - 2 + 1
+        } else if indexInSegment == 0 {
+            areaSize = segmentIndex * segmentLength - 2 + 1
+        } else {
+            areaSize = segmentIndex * segmentLength - 1 + 1
         }
     }
     guard let areaSize = areaSize else { exit(1) }
@@ -258,36 +263,32 @@ func referenzBlockPositionBerechnen(
 /// Diese Funktion berechnet alle weiteren Blöcke in der Matrix B[i][j], wobei 0<=i<=p und 2<=j<=Anzahl Spalten.
 func weitereBlöckeInMatrixBerechnen(matrix: Matrix<Data>, matrixSpaltenAnzahl: Int, durchgänge: UInt32, parallelism: UInt32) -> Matrix<Data> {
     var matrix = matrix
-    let segmentGröße = matrixSpaltenAnzahl / 4
-    let segments = (0...3).map {
-        ($0*segmentGröße)...(($0+1)*segmentGröße-1)
-    }
+    let segmentLength = matrixSpaltenAnzahl / 4
     
     let dispatchQueue = DispatchQueue.global(qos: .userInitiated)
     let dispatchGroup = DispatchGroup()
     let schloss = NSLock()
     
     for durchgang in 1...durchgänge {
-        for segmentIndex in segments.indices {
-            var segment = segments[segmentIndex]
-
-            if durchgang == 1, segment.upperBound == 1 {
+        for segmentIndex in 0...3 {
+            if durchgang == 1, segmentIndex == 0, segmentLength == 2 {
                 continue
-            }
-            if durchgang == 1, segment.lowerBound == 0 {
-                segment = (segment.lowerBound+2)...segment.upperBound
             }
             
             for i in matrix.indices {
                 dispatchGroup.enter()
                 
                 dispatchQueue.async {
-                    for j in segment {
+                    for indexInSegment in 0..<segmentLength {
+                        let j = segmentIndex * segmentLength + indexInSegment
+                        if j < 2 {
+                            continue
+                        }
                         let berechnungSpalte = negativesModulo(a: j-1, b: matrixSpaltenAnzahl)
                         let berechnungBlock = matrix[i][berechnungSpalte] // Block bei B[i][j-1]
                         
                         let referenzBlockPosition = referenzBlockPositionBerechnen(
-                            matrix: matrix, matrixSpaltenAnzahl: matrixSpaltenAnzahl, durchgang: durchgang, i: i, j: j, segmentBereiche: segments, segmentIndex: segmentIndex, parallelism: parallelism
+                            matrix: matrix, matrixSpaltenAnzahl: matrixSpaltenAnzahl, durchgang: durchgang, i: i, j: j, segmentIndex: segmentIndex, segmentLength: segmentLength, indexInSegment: indexInSegment, parallelism: parallelism
                         )
                         let referenzBlock = matrix[referenzBlockPosition.0][referenzBlockPosition.1]
                         

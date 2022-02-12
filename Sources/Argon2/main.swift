@@ -99,7 +99,7 @@ func main() {
 //        exit(1)
 //    }
     
-    let eingabe = Argon2Eingabewerte(passwort: "Passwort", salt: "Salt12345", parallelität: 1, ausgabelänge: 64, speichernutzung: 8, durchgänge: 1)
+    let eingabe = Argon2Eingabewerte(passwort: "Passwort", salt: "Salt123456", parallelität: 2, ausgabelänge: 32, speichernutzung: 16, durchgänge: 1)
 
     let hashwert = Argon2.hashwertBerechnen(eingabe: eingabe)
 
@@ -109,7 +109,7 @@ func main() {
     ausgabe += "m=\(eingabe.speichernutzung),"
     ausgabe += "t=\(eingabe.durchgänge),"
     ausgabe += "p=\(eingabe.parallelität)$"
-    ausgabe += "\(eingabe.salt.data(using: .utf8)!.base64EncodedString())$"
+    ausgabe += "\(eingabe.salt.data(using: .utf8)!.base64EncodedString().replacingOccurrences(of: "=", with: ""))$"
     ausgabe += "\(hashwert.base64EncodedString().replacingOccurrences(of: "=", with: ""))"
     
     print("Hash: \(hashwert.hexWert)")
