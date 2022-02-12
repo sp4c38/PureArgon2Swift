@@ -104,14 +104,14 @@ func main() {
     let hashwert = Argon2.hashwertBerechnen(eingabe: eingabe)
 
     var ausgabe = ""
-    ausgabe += "$argon2i$"
+    ausgabe += "$argon2d$"
     ausgabe += "v=19$"
     ausgabe += "m=\(eingabe.speichernutzung),"
     ausgabe += "t=\(eingabe.durchgänge),"
     ausgabe += "p=\(eingabe.parallelität)$"
     ausgabe += "\(eingabe.salt.data(using: .utf8)!.base64EncodedString())$"
-    ausgabe += "\(hashwert.base64EncodedString())"
-
+    ausgabe += "\(hashwert.base64EncodedString().replacingOccurrences(of: "=", with: ""))"
+    
     print("Hash: \(hashwert.hexWert)")
     print("{\"hash\": \"\(ausgabe)\"}")
 }

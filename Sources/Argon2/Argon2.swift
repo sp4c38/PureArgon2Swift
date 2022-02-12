@@ -279,9 +279,9 @@ func weitereBlöckeInMatrixBerechnen(matrix: Matrix<Data>, matrixSpaltenAnzahl: 
             }
             
             for i in matrix.indices {
-//                dispatchGroup.enter()
+                dispatchGroup.enter()
                 
-//                dispatchQueue.async {
+                dispatchQueue.async {
                     for j in segment {
                         let berechnungSpalte = negativesModulo(a: j-1, b: matrixSpaltenAnzahl)
                         let berechnungBlock = matrix[i][berechnungSpalte] // Block bei B[i][j-1]
@@ -303,12 +303,12 @@ func weitereBlöckeInMatrixBerechnen(matrix: Matrix<Data>, matrixSpaltenAnzahl: 
                         matrix[i][j] = ergebnis!
                         schloss.unlock()
                     }
-//                    dispatchGroup.leave()
-//                }
+                    dispatchGroup.leave()
+                }
                 
             }
             
-//            dispatchGroup.wait()
+            dispatchGroup.wait()
         }
     }
     return matrix
