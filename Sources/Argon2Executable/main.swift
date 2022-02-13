@@ -104,7 +104,7 @@ struct Argon2CommandLineUtility: ParsableCommand {
         print("Iterations: \(context.timeCost)")
         print("Memory: \(context.memoryCost) KiB")
         print("Parallelism: \(context.parallelism)")
-        print("Hash: \(hash.hexWert.lowercased())")
+        print("Hash: \(hash.hex.lowercased())")
         print("Encoded: \(encodedHash)")
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
