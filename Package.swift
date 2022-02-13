@@ -8,7 +8,8 @@ let package = Package(
     platforms: [.macOS(.v12)],
     products: [
         // Products define the executables and libraries a package produces, and make them visible to other packages.
-        .executable(name: "Argon2", targets: ["Argon2"])
+        .library(name: "Argon2", targets: ["Argon2"]),
+        .executable(name: "Argon2Executable", targets: ["Argon2Executable"])
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -18,12 +19,19 @@ let package = Package(
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
-        .executableTarget(name: "Argon2", dependencies: [
-            .product(name: "Blake2", package: "Blake2.swift"),
-            .product(name: "BigInt", package: "BigInt")
+        .target(name: "Shared", dependencies: [
+            .product(name: "BigInt", package: "BigInt"),
         ]),
-        .testTarget(
-            name: "Argon2Tests",
-            dependencies: ["Argon2"]),
+        
+        .target(name: "Argon2", dependencies: [
+            .product(name: "Blake2", package: "Blake2.swift"),
+            .product(name: "BigInt", package: "BigInt"),
+            .target(name: "Shared", condition: .none)
+        ]),
+        
+        .executableTarget(name: "Argon2Executable", dependencies: [
+            .target(name: "Argon2", condition: .none),
+            .target(name: "Shared", condition: .none)
+        ])
     ]
 )
