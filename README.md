@@ -20,15 +20,15 @@ make
 
 4. Now you've got the `argon2` executable file. To get the help message run `./argon2 -h`
 
-	An example for testing:
-
+	An example for testing:  
 	`echo -n "Password" | ./argon2 Salt1234 -p 3 -k 2048 -t 1`
 
 ## **Library**
 You can import PureArgon2Swift in your project using the Swift Package Manager.
 - _Add in Package.swift:_
 
-	Append following to your dependencies: `.package(url: "https://github.com/sp4c38/PureArgon2Swift", from: "1.0.0")`
+	Append following to your dependencies: `.package(url: "https://github.com/sp4c38/PureArgon2Swift", from: "1.0.0")`  
+	Append following to your targets dependencies: `.product(name: "Argon2", package: "PureArgon2Swift")`
 
 - _Add in Xcode project:_
 
