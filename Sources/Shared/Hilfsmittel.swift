@@ -101,18 +101,18 @@ extension Array where Element == [Data] {
 public typealias Matrix<T> = [[T]]
 
 // MARK: Modulo
-public func negativesModulo(a: Int, b: Int) -> Int {
+public func negativeModulo(a: Int, b: Int) -> Int {
     let ergebnis = a % b
     return ergebnis < 0 ? b + ergebnis : ergebnis
 }
 
 // MARK: Zeit messen
-public func zeitMessen<T>(_ codeBlock: () -> (T)) -> T {
+public func measureTime<T>(_ codeBlock: () -> (T)) -> (TimeInterval, T) {
     let startZeit = Date()
     let ausgabe = codeBlock()
     let endZeit = Date()
-    print("Zeit: \(endZeit.timeIntervalSince(startZeit))")
-    return ausgabe
+    let timeDifference = endZeit.timeIntervalSince(startZeit)
+    return (timeDifference, ausgabe)
 }
 
 
@@ -139,4 +139,14 @@ extension String {
         return data
     }
     
+}
+
+// MARK: FileHandle
+public var standardError = FileHandle.standardError
+
+extension FileHandle: TextOutputStream {
+  public func write(_ string: String) {
+    let data = Data(string.utf8)
+    self.write(data)
+  }
 }

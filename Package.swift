@@ -14,7 +14,9 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/tesseract-one/Blake2.swift.git", from: "0.1.0"),
-        .package(url: "https://github.com/attaswift/BigInt.git", from: "5.3.0")
+        .package(url: "https://github.com/attaswift/BigInt.git", from: "5.3.0"),
+        .package(url: "https://github.com/tgymnich/BitwiseRotate.git", from: "1.1.1"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.0.3")
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -26,10 +28,12 @@ let package = Package(
         .target(name: "Argon2", dependencies: [
             .product(name: "Blake2", package: "Blake2.swift"),
             .product(name: "BigInt", package: "BigInt"),
+            .product(name: "BitwiseRotate", package: "BitwiseRotate"),
             .target(name: "Shared", condition: .none)
         ]),
         
         .executableTarget(name: "Argon2Executable", dependencies: [
+            .product(name: "ArgumentParser", package: "swift-argument-parser"),
             .target(name: "Argon2", condition: .none),
             .target(name: "Shared", condition: .none)
         ])
