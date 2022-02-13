@@ -28,7 +28,7 @@ make
 You can import PureArgon2Swift in your project using the Swift Package Manager.
 - _Add in Package.swift:_
 
-	Append following to your dependencies: `.package(url: "https://github.com/sp4c38/PureArgon2Swift", from: "1.0.0"),`
+	Append following to your dependencies: `.package(url: "https://github.com/sp4c38/PureArgon2Swift", from: "1.0.0")`
 
 - _Add in Xcode project:_
 

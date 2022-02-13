@@ -36,6 +36,9 @@ public enum Argon2TypeParameter: UInt32, EnumerableFlag {
 }
 
 struct Argon2CommandLineUtility: ParsableCommand {
+    
+    static var configuration: CommandConfiguration = CommandConfiguration(commandName: "argon2", abstract: "Calculates hash with Argon2", discussion: "Password is read from stdin.")
+    
     @Flag(exclusivity: .exclusive, help: "Sets the Argon2 type (default argon2d)")
     var argon2TypeParameter: Argon2TypeParameter?
     
