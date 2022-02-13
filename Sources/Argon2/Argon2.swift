@@ -5,8 +5,8 @@
 //  Created by Léon Becker am 29.12.21.
 //
 
-// Based on https://www.rfc-editor.org/rfc/rfc9106.pdf.
-// Inspired by https://github.com/bwesterb/argon2pure.
+// Based on https://www.rfc-editor.org/rfc/rfc9106.pdf
+// Inspired by https://github.com/bwesterb/argon2pure
 
 import BigInt
 import BitwiseRotate
