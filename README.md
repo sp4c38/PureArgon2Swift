@@ -1,15 +1,15 @@
-# PureArgon2Swift
+# 🔒 PureArgon2Swift 🔒
 
 A pure implementation of the Argon2 hash function algorithm in Swift.
 
 **Note:** For the Blake2b parts of the algorithm a C implementation of Blake2b is used.
 
-## Implementation notes
+## 💡 Implementation notes
 
 Based on Argon2 RFC 9106: https://www.rfc-editor.org/rfc/rfc9106.pdf.  
 Inspired by https://github.com/bwesterb/argon2pure.
 
-## **Executable**
+## 📁 **Executable**
 You can run PureArgon2Swift as executable in your terminal, by following these steps:
 
 1. Make sure Xcode is installed. 
@@ -28,7 +28,7 @@ make
 	An example for testing:  
 	`echo -n "Password" | ./argon2 Salt1234 -p 3 -k 2048 -t 1`
 
-## **Library**
+## 📚 **Library**
 You can import PureArgon2Swift in your project using the Swift Package Manager.
 - _Add in Package.swift:_
 
